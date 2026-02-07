@@ -1,116 +1,159 @@
-let clothingItems = require("../data/clothing");
+const mongoose = require("mongoose");
+const Product = require("../models/Product");
 
-exports.getAllClothing = (req, res) => {
-  const { category, inStock } = req.query;
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-  let result = clothingItems;
+exports.getAllClothing = async(req, res, next) => {
+    try {
+        const { category, inStock } = req.query;
 
-  if (category) {
-    result = result.filter(
-      (item) => item.category.toLowerCase() === category.toLowerCase()
-    );
-  }
+        const filter = {};
 
-  if (inStock !== undefined) {
-    const inStockBool = inStock === "true";
-    result = result.filter((item) => item.inStock === inStockBool);
-  }
+        if (category) {
+            filter.category = String(category).toLowerCase();
+        }
 
-  res.status(200).json({ count: result.length, data: result });
-};
+        if (inStock !== undefined) {
+            filter.inStock = String(inStock) === "true";
+        }
 
-exports.getClothingById = (req, res) => {
-  const id = Number(req.params.id);
-  const item = clothingItems.find((c) => c.id === id);
+        const items = await Product.find(filter).sort("-createdAt");
 
-  if (!item) {
-    return res.status(404).json({ message: "Clothing item not found" });
-  }
-
-  res.status(200).json(item);
-};
-
-exports.createClothingItem = (req, res, next) => {
-  try {
-    const { name, category, size, price, inStock } = req.body;
-
-    if (!name || !category || !price) {
-      return res
-        .status(400)
-        .json({ message: "name, category, and price are required" });
+        res.status(200).json({ count: items.length, data: items });
+    } catch (err) {
+        next(err);
     }
-
-    const newItem = {
-      id: Date.now(),
-      name,
-      category,
-      size: size || [],
-      price,
-      inStock: inStock || true,
-    };
-
-    clothingItems.push(newItem);
-    res.status(201).json(newItem);
-  } catch (err) {
-    next(err);
-  }
 };
 
-exports.updateClothingItem = (req, res) => {
-  const id = Number(req.params.id);
-  const index = clothingItems.findIndex((c) => c.id === id);
+exports.getClothingById = async(req, res, next) => {
+    try {
+        const { id } = req.params;
 
-  if (index === -1) {
-    return res.status(404).json({ message: "Clothing item not found" });
-  }
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: "Invalid clothing item id" });
+        }
 
-  const { name, category, size, price, inStock } = req.body;
+        const item = await Product.findById(id);
 
-  if (!name || !category || price === undefined) {
-    return res
-      .status(400)
-      .json({ message: "name, category, and price are required" });
-  }
+        if (!item) {
+            return res.status(404).json({ message: "Clothing item not found" });
+        }
 
-  clothingItems[index] = {
-    id,
-    name,
-    category,
-    size: size || [],
-    price,
-    inStock: inStock || true,
-  };
-
-  res.status(200).json(clothingItems[index]);
+        res.status(200).json(item);
+    } catch (err) {
+        next(err);
+    }
 };
 
-exports.partialUpdateClothingItem = (req, res) => {
-  const id = Number(req.params.id);
-  const item = clothingItems.find((c) => c.id === id);
+exports.createClothingItem = async(req, res, next) => {
+    try {
+        const { name, category, size, price, inStock } = req.body;
 
-  if (!item) {
-    return res.status(404).json({ message: "Clothing item not found" });
-  }
+        if (!name || !category || price === undefined || !size) {
+            return res.status(400).json({
+                message: "name, category, size, and price are required",
+            });
+        }
 
-  const { name, category, size, price, inStock } = req.body;
+        const created = await Product.create({
+            name,
+            category: String(category).toLowerCase(),
+            size: String(size).toUpperCase(),
+            price,
+            inStock: inStock !== undefined ? inStock : true,
+        });
 
-  if (name !== undefined) item.name = name;
-  if (category !== undefined) item.category = category;
-  if (size !== undefined) item.size = size;
-  if (price !== undefined) item.price = price;
-  if (inStock !== undefined) item.inStock = inStock;
-
-  res.status(200).json(item);
+        res.status(201).json(created);
+    } catch (err) {
+        next(err);
+    }
 };
 
-exports.deleteClothingItem = (req, res) => {
-  const id = Number(req.params.id);
-  const exists = clothingItems.some((c) => c.id === id);
+exports.updateClothingItem = async(req, res, next) => {
+    try {
+        const { id } = req.params;
 
-  if (!exists) {
-    return res.status(404).json({ message: "Clothing item not found" });
-  }
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: "Invalid clothing item id" });
+        }
 
-  clothingItems = clothingItems.filter((c) => c.id !== id);
-  res.status(200).json({ message: "Clothing item deleted successfully" });
+        const { name, category, size, price, inStock } = req.body;
+
+        if (!name || !category || price === undefined || !size) {
+            return res.status(400).json({
+                message: "name, category, size, and price are required",
+            });
+        }
+
+        const updated = await Product.findByIdAndUpdate(
+            id, {
+                name,
+                category: String(category).toLowerCase(),
+                size: String(size).toUpperCase(),
+                price,
+                inStock: inStock !== undefined ? inStock : true,
+            }, { new: true, runValidators: true },
+        );
+
+        if (!updated) {
+            return res.status(404).json({ message: "Clothing item not found" });
+        }
+
+        res.status(200).json(updated);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.partialUpdateClothingItem = async(req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: "Invalid clothing item id" });
+        }
+
+        const update = {...req.body };
+
+        if (update.category !== undefined) {
+            update.category = String(update.category).toLowerCase();
+        }
+
+        if (update.size !== undefined) {
+            update.size = String(update.size).toUpperCase();
+        }
+
+        const updated = await Product.findByIdAndUpdate(id, update, {
+            new: true,
+            runValidators: true,
+        });
+
+        if (!updated) {
+            return res.status(404).json({ message: "Clothing item not found" });
+        }
+
+        res.status(200).json(updated);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.deleteClothingItem = async(req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: "Invalid clothing item id" });
+        }
+
+        const deleted = await Product.findByIdAndDelete(id);
+
+        if (!deleted) {
+            return res.status(404).json({ message: "Clothing item not found" });
+        }
+
+        res.status(200).json({ message: "Clothing item deleted successfully" });
+    } catch (err) {
+        next(err);
+    }
 };

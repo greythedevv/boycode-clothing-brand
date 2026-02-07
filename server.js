@@ -1,7 +1,15 @@
 const app = require("./app");
 
-const PORT = 3000;
+const connectDB = require("./config/db");
 
-app.listen(PORT, () => {
-  console.log(`Clothing Store API running on port ${PORT}`);
+const PORT = process.env.PORT || 3000;
+
+async function start() {
+    await connectDB();
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+start().catch((err) => {
+    console.error("Failed to start server:", err.message);
+    process.exit(1);
 });

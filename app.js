@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 
@@ -12,7 +13,7 @@ app.use(logger);
 app.use("/api/clothing", clothingRoutes);
 
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+    res.status(404).json({ message: "Route not found" });
 });
 
 // app.use(errorHandler);
